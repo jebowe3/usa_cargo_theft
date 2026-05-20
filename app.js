@@ -1,11 +1,4 @@
 // Cargo Theft Dashboard
-// Put these files in the same folder:
-// - index.html
-// - styles.css
-// - app.js
-// - cargo-theft-all.csv
-// - us-counties.geojson
-
 const CSV_URL = "cargo-theft-all.csv";
 const GEOJSON_URL = "us-counties.geojson";
 
@@ -48,6 +41,193 @@ let valueMap = null;
 let selectedFilters = {};
 let tooltip = null;
 let dateRangeSlider = null;
+
+function syncSelectedFiltersFromDom() {
+  for (const config of filterConfigs) {
+    selectedFilters[config.id] = new Set();
+
+    const section = [...document.querySelectorAll(".filter-section")]
+      .find(sec => sec.querySelector("label")?.textContent === config.label);
+
+    if (!section) continue;
+
+    section.querySelectorAll("input[type='checkbox']:checked").forEach(cb => {
+      selectedFilters[config.id].add(cb.value);
+    });
+  }
+}
+
+function getFilteredRows() {
+  const { startDate, endDate } = getSelectedDateRange();
+
+  return rows.filter(row => rowPassesFilters(row, startDate, endDate));
+}
+
+function exportFilteredCsv() {
+  syncSelectedFiltersFromDom();
+
+  const filteredRows = getFilteredRows();
+
+  if (filteredRows.length === 0) {
+    alert("No records match the current filters.");
+    return;
+  }
+
+  const exportRows = filteredRows.map(row => {
+    const cleanRow = { ...row };
+    delete cleanRow.__IncidentDate;
+    return cleanRow;
+  });
+
+  const csv = Papa.unparse(exportRows);
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "cargo-theft-filtered-data.csv";
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function getCurrentTargetBounds() {
+  if (anyFiltersSelected()) {
+    const agg = aggregateByCounty();
+    return enhanceCountyGeojson(agg);
+  }
+  return null;
+}
+
+function resetVisibleMapView() {
+  const visibleIsIncident = document.getElementById("incidentPanel").classList.contains("active-map");
+  const activeMap = visibleIsIncident ? incidentMap : valueMap;
+
+  activeMap.resize();
+
+  setTimeout(() => {
+    if (anyFiltersSelected()) {
+      const enhanced = getCurrentTargetBounds();
+      zoomToFilteredPolygons(enhanced);
+    } else {
+      zoomToLower48();
+    }
+  }, 100);
+}
+
+function getVisibleMapInfo() {
+  const isIncident = document.getElementById("incidentPanel").classList.contains("active-map");
+
+  return {
+    map: isIncident ? incidentMap : valueMap,
+    panel: isIncident ? document.getElementById("incidentPanel") : document.getElementById("valuePanel"),
+    title: isIncident ? "Total Incidents by County" : "Total Value Stolen by County",
+    legend: isIncident ? document.getElementById("incidentLegend") : document.getElementById("valueLegend")
+  };
+}
+
+async function exportVisibleMapPng() {
+  const { map, title, legend } = getVisibleMapInfo();
+
+  map.triggerRepaint();
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  const mapCanvas = map.getCanvas();
+
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = mapCanvas.width;
+  exportCanvas.height = mapCanvas.height + 50;
+
+  const ctx = exportCanvas.getContext("2d");
+
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+  ctx.fillStyle = "black";
+  ctx.font = "bold 24px Arial";
+  ctx.fillText(title, 20, 32);
+
+  ctx.drawImage(mapCanvas, 0, 50);
+
+  const legendCanvas = await html2canvas(legend, {
+    backgroundColor: null,
+    scale: 2,
+    useCORS: true
+  });
+
+  ctx.drawImage(
+    legendCanvas,
+    20,
+    exportCanvas.height - legendCanvas.height / 2 - 20,
+    legendCanvas.width / 2,
+    legendCanvas.height / 2
+  );
+
+  const link = document.createElement("a");
+  link.href = exportCanvas.toDataURL("image/png");
+  link.download = "cargo-theft-map.png";
+  link.click();
+}
+
+function anyFiltersSelected() {
+  return Object.values(selectedFilters).some(set => set.size > 0);
+}
+
+function zoomToLower48() {
+  const lower48Bounds = [
+    [-125.0, 24.0],
+    [-66.5, 49.5]
+  ];
+
+  incidentMap.fitBounds(lower48Bounds, {
+    padding: 30,
+    duration: 700
+  });
+
+  valueMap.fitBounds(lower48Bounds, {
+    padding: 30,
+    duration: 700
+  });
+}
+
+function zoomToFilteredPolygons(enhancedGeojson) {
+  const matchingFeatures = enhancedGeojson.features.filter(f =>
+    Number(f.properties.incidents || 0) > 0 ||
+    Number(f.properties.stolenValue || 0) > 0
+  );
+
+  if (matchingFeatures.length === 0) return;
+
+  const bounds = new maplibregl.LngLatBounds();
+
+  function extendCoords(coords) {
+    if (typeof coords[0] === "number") {
+      bounds.extend(coords);
+    } else {
+      coords.forEach(extendCoords);
+    }
+  }
+
+  matchingFeatures.forEach(feature => {
+    extendCoords(feature.geometry.coordinates);
+  });
+
+  if (!bounds.isEmpty()) {
+    incidentMap.fitBounds(bounds, {
+      padding: 40,
+      duration: 700,
+      maxZoom: 8
+    });
+
+    valueMap.fitBounds(bounds, {
+      padding: 40,
+      duration: 700,
+      maxZoom: 8
+    });
+  }
+}
 
 function dateToSliderValue(date) {
   return daysBetween(START_DATE, date);
@@ -246,8 +426,9 @@ function refreshFilterOptions() {
       const isAvailable = availableValues.has(cb.value);
       const isSelected = selectedFilters[config.id].has(cb.value);
 
-      cb.disabled = !isAvailable && !isSelected;
-      cb.parentElement.style.opacity = cb.disabled ? "0.35" : "1";
+      const shouldShow = isAvailable || isSelected;
+
+      cb.parentElement.style.display = shouldShow ? "block" : "none";
     });
 
     const dropdown = section.querySelector(".dropdown");
@@ -384,6 +565,12 @@ function updateMaps() {
 
   updateSingleMap(incidentMap, enhanced, "incidents", incidentBreaks, "incidentLegend", "Incidents");
   updateSingleMap(valueMap, enhanced, "stolenValue", valueBreaks, "valueLegend", "Value Stolen");
+
+  if (anyFiltersSelected()) {
+    zoomToFilteredPolygons(enhanced);
+  } else {
+    zoomToLower48();
+  }
 }
 
 function updateSingleMap(map, geojson, propertyName, breaks, legendId, legendTitle) {
@@ -423,6 +610,7 @@ function buildLegend(id, title, breaks, currency = false) {
 function createMap(containerId, propertyName) {
   const map = new maplibregl.Map({
     container: containerId,
+    preserveDrawingBuffer: true,
     style: {
       version: 8,
       sources: {
@@ -552,6 +740,9 @@ async function loadData() {
     }
   });
 
+  document.getElementById("exportMapPng").addEventListener("click", exportVisibleMapPng);
+  document.getElementById("exportCsv").addEventListener("click", exportFilteredCsv);
+
   document.getElementById("startDateInput").value = "2015-01-01";
   document.getElementById("endDateInput").value = "2025-12-31";
 
@@ -624,7 +815,7 @@ async function loadData() {
     document.getElementById("showIncidentMap").classList.add("active");
     document.getElementById("showValueMap").classList.remove("active");
 
-    setTimeout(() => incidentMap.resize(), 100);
+    resetVisibleMapView();
   });
 
   document.getElementById("showValueMap").addEventListener("click", () => {
@@ -637,7 +828,7 @@ async function loadData() {
     document.getElementById("showValueMap").classList.add("active");
     document.getElementById("showIncidentMap").classList.remove("active");
 
-    setTimeout(() => valueMap.resize(), 100);
+    resetVisibleMapView();
   });
 
 }
