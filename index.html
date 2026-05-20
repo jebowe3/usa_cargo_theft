@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cargo Theft Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside id="sidebar">
+    <div id="sidebarHeader">
+      <h2>Nationwide Cargo<br>Theft Mapper</h2>
+      <button id="toggleSidebar" title="Collapse filters">‹</button>
+    </div>
+
+    <div class="filter-section">
+      <label>Date Range</label>
+      <div class="date-input-row"> 
+        <input type="date" id="startDateInput" min="2015-01-01" max="2025-12-31">
+        <input type="date" id="endDateInput" min="2015-01-01" max="2025-12-31">
+      </div>
+      <div id="dateRangeSlider"></div>
+      <div id="dateRangeLabel"></div>
+    </div>
+
+    <div id="filters"></div>
+
+    <button id="clearFilters">Clear Filters</button>
+  </aside>
+
+  <main id="main">
+    <div id="mapToggle">
+      <button id="showIncidentMap" class="active">Incidents</button>
+      <button id="showValueMap">Value Stolen</button>
+    </div>
+
+    <section id="incidentPanel" class="map-panel active-map">
+      <h2>Total Incidents by County</h2>
+      <div id="incidentMap" class="map"></div>
+      <div id="incidentLegend" class="legend"></div>
+    </section>
+
+    <section id="valuePanel" class="map-panel hidden-map">
+      <h2>Total Value Stolen by County</h2>
+      <div id="valueMap" class="map"></div>
+      <div id="valueLegend" class="legend"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+:root {
+  --ui-top-offset: 0px;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  display: flex;
+  overflow: hidden;
+}
+
+#sidebar {
+  position: relative;
+  width: 330px;
+  min-width: 330px;
+  max-width: 330px;
+  height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 14px;
+  background: #f7f7f7;
+  border-right: 1px solid #ccc;
+  transition: all 0.2s ease;
+}
+
+#sidebar.collapsed {
+  width: 54px;
+  min-width: 54px;
+  max-width: 54px;
+
+  overflow: hidden;
+
+  padding: 10px 8px;
+}
+
+#sidebar.collapsed #sidebarHeader h2,
+#sidebar.collapsed .filter-section,
+#sidebar.collapsed #filters,
+#sidebar.collapsed #clearFilters {
+  display: none;
+}
+
+#sidebar.collapsed #sidebarHeader {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+#sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+#sidebarHeader h2 {
+  margin: 0;
+}
+
+#toggleSidebar {
+  position: absolute;
+  top: var(--ui-top-offset);
+  right: 14px;
+
+  width: 34px;
+  height: 34px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: rgba(255,255,255,0.96);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.20);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1px;
+  padding-bottom: 8px;
+
+  font-family:
+    "Segoe UI Symbol",
+    "Arial Unicode MS",
+    sans-serif;
+
+  cursor: pointer;
+
+  text-align: center;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+#sidebar.collapsed #toggleSidebar {
+  left: 10px;
+  right: auto;
+  top: var(--ui-top-offset);
+}
+
+#toggleSidebar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+}
+
+#main {
+  flex: 1;
+  position: relative;
+  height: 100vh;
+}
+
+#mapToggle {
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  z-index: 5;
+
+  background: rgba(255,255,255,0.96);
+
+  padding: 1px 4px;
+  border-radius: 4px;
+
+  box-shadow: 0 1px 4px rgba(0,0,0,0.20);
+
+  display: flex;
+  gap: 4px;
+}
+
+#mapToggle button {
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 3px;
+}
+
+#mapToggle button.active {
+  font-weight: bold;
+  border: 1px solid #333;
+}
+
+.map-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hidden-map {
+  display: none;
+}
+
+.active-map {
+  display: flex;
+}
+
+.map-panel h2 {
+  margin: 8px 12px;
+  font-size: 18px;
+}
+
+.map {
+  flex: 1;
+}
+
+.filter-section {
+  margin-bottom: 14px;
+}
+
+.filter-section label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.dropdown {
+  border: 1px solid #bbb;
+  background: white;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.dropdown-content {
+  display: none;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #bbb;
+  border-top: 0;
+  background: white;
+  padding: 8px;
+}
+
+.dropdown-content.open {
+  display: block;
+}
+
+.dropdown-content label {
+  display: block;
+  font-weight: normal;
+  margin: 4px 0;
+}
+
+.range-row {
+  position: relative;
+}
+
+.range-row input[type="range"] {
+  width: 100%;
+}
+
+button {
+  padding: 8px;
+  margin: 5px 0;
+  cursor: pointer;
+}
+
+#clearFilters {
+  width: 100%;
+}
+
+.legend {
+  position: absolute;
+  bottom: 24px;
+  left: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  z-index: 2;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #999;
+  padding: 8px;
+  font-size: 13px;
+  border-radius: 4px;
+  z-index: 10;
+  max-width: 260px;
+}
+
+.date-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.date-input-row input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 5px;
+}
+
+#dateRangeSlider {
+  margin: 14px 8px 10px 8px;
+}
+
+.noUi-connect {
+  background: #4292c6;
+}
+
+.noUi-horizontal {
+  height: 8px;
+}
+
+.noUi-horizontal .noUi-handle {
+  width: 16px;
+  height: 16px;
+  right: -8px;
+  top: -5px;
+  border-radius: 50%;
+}
