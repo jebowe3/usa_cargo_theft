@@ -31,6 +31,53 @@ let valueMap = null;
 let selectedFilters = {};
 let tooltip = null;
 let dateRangeSlider = null;
+let popupChart = null;
+
+function getCountyYearSeries(geoid, metric) {
+  const { startDate, endDate } = getSelectedDateRange();
+
+  const years = {};
+  for (let y = 2015; y <= 2025; y++) {
+    years[y] = 0;
+  }
+
+  for (const row of rows) {
+    if (cleanValue(row.GEOID) !== cleanValue(geoid)) continue;
+    if (!rowPassesFilters(row, startDate, endDate)) continue;
+
+    const date = row.__IncidentDate;
+    if (!date) continue;
+
+    const year = date.getFullYear();
+
+    if (metric === "incidents") {
+      years[year] += 1;
+    } else {
+      years[year] += row.__stolenValue ?? numberFromValue(row.Stolen_Value_Total);
+    }
+  }
+
+  return {
+    labels: Object.keys(years),
+    values: Object.values(years)
+  };
+}
+
+function calculateTrendline(values) {
+  const n = values.length;
+  const x = values.map((_, i) => i);
+  const y = values;
+
+  const sumX = x.reduce((a, b) => a + b, 0);
+  const sumY = y.reduce((a, b) => a + b, 0);
+  const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+  const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
+
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+
+  return x.map(xi => intercept + slope * xi);
+}
 
 function syncMapCamera(fromMap, toMap) {
   toMap.jumpTo({
@@ -736,10 +783,91 @@ function createMap(containerId, propertyName) {
           <strong>${countyName}</strong><br>
           Incidents: ${Number(p.incidents || 0).toLocaleString()}<br>
           Total Value Stolen: $${Math.round(value).toLocaleString()}
+          <div style="width:260px;height:150px;margin-top:8px;">
+            <canvas id="popupTrendChart"></canvas>
+          </div>
         `;
-        tooltip.style.left = `${e.originalEvent.pageX + 12}px`;
-        tooltip.style.top = `${e.originalEvent.pageY + 12}px`;
+        const padding = 14;
+
+        const tooltipWidth = 300;
+        const tooltipHeight = 260;
+
+        let left = e.originalEvent.pageX + 12;
+        let top = e.originalEvent.pageY + 12;
+
+        if (left + tooltipWidth > window.innerWidth - padding) {
+          left = e.originalEvent.pageX - tooltipWidth - 12;
+        }
+
+        if (top + tooltipHeight > window.innerHeight - padding) {
+          top = window.innerHeight - tooltipHeight - padding;
+        }
+
+        if (left < padding) left = padding;
+        if (top < padding) top = padding;
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
         tooltip.style.display = "block";
+        const showingIncident =
+          document.getElementById("incidentPanel").classList.contains("active-map");
+
+        const metric = showingIncident ? "incidents" : "value";
+
+        const series = getCountyYearSeries(p.GEOID, metric);
+
+        const trend = calculateTrendline(series.values);
+
+        if (popupChart) {
+          popupChart.destroy();
+        }
+
+        popupChart = new Chart(document.getElementById("popupTrendChart"), {
+          type: "line",
+          data: {
+            labels: series.labels,
+            datasets: [
+              {
+                label: showingIncident ? "Incidents" : "Value Stolen",
+                data: series.values,
+                pointRadius: 2,
+                tension: 0.25
+              },
+              {
+                label: "Trend",
+                data: trend,
+                pointRadius: 0,
+                borderDash: [5, 5],
+                tension: 0
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              x: {
+                ticks: {
+                  maxRotation: 0,
+                  font: { size: 9 }
+                }
+              },
+              y: {
+                ticks: {
+                  font: { size: 9 },
+                  callback: v =>
+                    showingIncident
+                      ? v
+                      : "$" + Number(v).toLocaleString()
+                }
+              }
+            }
+          }
+        });
       }
     });
 
@@ -750,6 +878,11 @@ function createMap(containerId, propertyName) {
       }
       hoveredId = null;
       tooltip.style.display = "none";
+
+      if (popupChart) {
+        popupChart.destroy();
+        popupChart = null;
+      }      
     });
 
     updateMaps();
