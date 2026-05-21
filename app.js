@@ -1,5 +1,10 @@
 // Cargo Theft Dashboard
-const CSV_URL = "cargo-theft-dashboard.csv";
+const DASHBOARD_CSV_URL = "cargo-theft-dashboard.csv";
+const FULL_CSV_URL = "cargo-theft-all.csv";
+
+const CSV_URL = DASHBOARD_CSV_URL;
+let fullRows = null;
+
 const GEOJSON_URL = "us-counties.geojson";
 
 const START_DATE = new Date(2015, 0, 1);
@@ -57,20 +62,42 @@ function getFilteredRows() {
   return rows.filter(row => rowPassesFilters(row, startDate, endDate));
 }
 
-function exportFilteredCsv() {
+async function loadFullRowsIfNeeded() {
+  if (fullRows) return fullRows;
+
+  fullRows = await new Promise((resolve, reject) => {
+    Papa.parse(FULL_CSV_URL, {
+      header: true,
+      download: true,
+      skipEmptyLines: true,
+      worker: false,
+      complete: result => resolve(result.data),
+      error: reject
+    });
+  });
+
+  return fullRows;
+}
+
+async function exportFilteredCsv() {
   syncSelectedFiltersFromDom();
 
-  const filteredRows = getFilteredRows();
+  const filteredDashboardRows = getFilteredRows();
 
-  if (filteredRows.length === 0) {
+  if (filteredDashboardRows.length === 0) {
     alert("No records match the current filters.");
     return;
   }
 
-  const exportRows = filteredRows.map(row => {
-    const cleanRow = { ...row };
-    delete cleanRow.__IncidentDate;
-    return cleanRow;
+  const matchingIds = new Set(
+    filteredDashboardRows.map(row => String(row.Record_ID))
+  );
+
+  const allFullRows = await loadFullRowsIfNeeded();
+
+  const exportRows = allFullRows.filter((row, index) => {
+    const recordId = String(index + 1);
+    return matchingIds.has(recordId);
   });
 
   const csv = Papa.unparse(exportRows);
@@ -80,7 +107,7 @@ function exportFilteredCsv() {
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = "cargo-theft-filtered-data.csv";
+  link.download = "cargo-theft-filtered-full-data.csv";
   link.click();
 
   URL.revokeObjectURL(url);
