@@ -1,29 +1,14 @@
 // Cargo Theft Dashboard
-const CSV_URL = "cargo-theft-all.csv";
+const CSV_URL = "cargo-theft-dashboard.csv";
 const GEOJSON_URL = "us-counties.geojson";
 
 const START_DATE = new Date(2015, 0, 1);
 const END_DATE = new Date(2025, 11, 31);
 
-const offenseFields = [
-  "Offense1_UCR", "Offense2_UCR", "Offense3_UCR", "Offense4_UCR", "Offense5_UCR",
-  "Offense6_UCR", "Offense7_UCR", "Offense8_UCR", "Offense9_UCR", "Offense10_UCR"
-];
-
-const offenseLocationFields = [
-  "Offense1_Location", "Offense2_Location", "Offense3_Location", "Offense4_Location", "Offense5_Location",
-  "Offense6_Location", "Offense7_Location", "Offense8_Location", "Offense9_Location", "Offense10_Location"
-];
-
-const victimFields = [
-  "VictimType1", "VictimType2", "VictimType3", "VictimType4", "VictimType5",
-  "VictimType6", "VictimType7", "VictimType8", "VictimType9"
-];
-
-const propertyFields = [
-  "Property1_Desc", "Property2_Desc", "Property3_Desc", "Property4_Desc", "Property5_Desc",
-  "Property6_Desc", "Property7_Desc", "Property8_Desc", "Property9_Desc", "Property10_Desc"
-];
+const offenseFields = ["offenses"];
+const offenseLocationFields = ["locations"];
+const victimFields = ["victims"];
+const propertyFields = ["properties"];
 
 const filterConfigs = [
   { id: "state", label: "State", mode: "single", field: "State" },
@@ -41,6 +26,15 @@ let valueMap = null;
 let selectedFilters = {};
 let tooltip = null;
 let dateRangeSlider = null;
+
+function syncMapCamera(fromMap, toMap) {
+  toMap.jumpTo({
+    center: fromMap.getCenter(),
+    zoom: fromMap.getZoom(),
+    bearing: fromMap.getBearing(),
+    pitch: fromMap.getPitch()
+  });
+}
 
 function syncSelectedFiltersFromDom() {
   for (const config of filterConfigs) {
@@ -307,6 +301,13 @@ function uniqueNonBlank(values) {
 }
 
 function getRowValues(row, fields) {
+  if (fields.length === 1 && ["offenses", "locations", "victims", "properties"].includes(fields[0])) {
+    return cleanValue(row[fields[0]])
+      .split("|")
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
+
   return fields.map(f => cleanValue(row[f])).filter(Boolean);
 }
 
@@ -557,15 +558,36 @@ function updateMaps() {
   const agg = aggregateByCounty();
   const enhanced = enhanceCountyGeojson(agg);
 
-  const incidentValues = enhanced.features.map(f => f.properties.incidents);
-  const stolenValues = enhanced.features.map(f => f.properties.stolenValue);
+  const showingIncident =
+    document.getElementById("incidentPanel").classList.contains("active-map");
 
-  const incidentBreaks = getBreaks(incidentValues);
-  const valueBreaks = getBreaks(stolenValues);
+  if (showingIncident) {
+    const incidentValues = enhanced.features.map(f => f.properties.incidents);
+    const incidentBreaks = getBreaks(incidentValues);
 
-  updateSingleMap(incidentMap, enhanced, "incidents", incidentBreaks, "incidentLegend", "Incidents");
-  updateSingleMap(valueMap, enhanced, "stolenValue", valueBreaks, "valueLegend", "Value Stolen");
+    updateSingleMap(
+      incidentMap,
+      enhanced,
+      "incidents",
+      incidentBreaks,
+      "incidentLegend",
+      "Incidents"
+    );
+  } else {
+    const stolenValues = enhanced.features.map(f => f.properties.stolenValue);
+    const valueBreaks = getBreaks(stolenValues);
 
+    updateSingleMap(
+      valueMap,
+      enhanced,
+      "stolenValue",
+      valueBreaks,
+      "valueLegend",
+      "Value Stolen"
+    );
+  }
+
+  // Optional: comment this block out if filtering still feels slow.
   if (anyFiltersSelected()) {
     zoomToFilteredPolygons(enhanced);
   } else {
@@ -815,7 +837,10 @@ async function loadData() {
     document.getElementById("showIncidentMap").classList.add("active");
     document.getElementById("showValueMap").classList.remove("active");
 
-    resetVisibleMapView();
+    syncMapCamera(valueMap, incidentMap);
+
+    incidentMap.resize();
+    updateMaps();
   });
 
   document.getElementById("showValueMap").addEventListener("click", () => {
@@ -828,7 +853,10 @@ async function loadData() {
     document.getElementById("showValueMap").classList.add("active");
     document.getElementById("showIncidentMap").classList.remove("active");
 
-    resetVisibleMapView();
+    syncMapCamera(incidentMap, valueMap);
+
+    valueMap.resize();
+    updateMaps();
   });
 
 }
