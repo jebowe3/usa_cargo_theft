@@ -599,7 +599,7 @@ function colorExpression(propertyName, breaks) {
   // ColorBrewer-style Reds.
   return [
     "step",
-    ["get", propertyName],
+    ["coalesce", ["get", propertyName], 0],
     "#f7fbff",
     breaks[1] || 1, "#deebf7",
     breaks[2] || 2, "#9ecae1",
@@ -611,7 +611,12 @@ function colorExpression(propertyName, breaks) {
 function enhanceCountyGeojson(agg) {
   const features = countiesGeojson.features.map(feature => {
     const geoid = cleanValue(feature.properties.GEOID);
-    const values = agg.get(geoid) || { incidents: 0, stolenValue: 0 };
+    const raw = agg.get(geoid) || {};
+
+    const values = {
+      incidents: Number(raw.incidents) || 0,
+      stolenValue: Number(raw.stolenValue) || 0
+    };
 
     return {
       ...feature,
